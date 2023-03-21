@@ -13,14 +13,13 @@ return new class extends Migration
     {
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('transaction_id');
             $table->unsignedBigInteger('user_id');
-            $table->boolean('status')->default(true);
-            $table->foreign('transaction_id')->references('id')->on('transactions');
-            $table->date('start_date');
-            $table->date('due_date');
+            $table->unsignedBigInteger('plan_id');
             $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('plan_id')->references('id')->on('plans');
+            $table->boolean('status')->default(true);
             $table->bigInteger('uptime');
+            $table->boolean('welcome_message_sent')->default(0);
             $table->timestamps();
         });
     }

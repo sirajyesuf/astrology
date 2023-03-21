@@ -14,11 +14,10 @@ return new class extends Migration
         Schema::create('plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('number_session');
-            $table->boolean('is_free')->default(false);
+            $table->integer('number_of_session');
             $table->integer('price')->nullable();
-            $table->string('promo_code')->nullable();
             $table->string("description");
+            $table->boolean('is_primary')->default(false);
             $table->timestamps();
         });
     }

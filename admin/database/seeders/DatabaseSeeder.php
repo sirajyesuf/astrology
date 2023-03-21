@@ -23,32 +23,18 @@ class DatabaseSeeder extends Seeder
         $plans = [
             [
                 'name' => 'basic',
-                'number_session' => 1,
-                'price' => 3,
-                'is_free' => false,
-                'promo_code' => null,
+                'number_of_session' => 15,
+                'price' => 9.9,
+                'is_primary' => true,
                 'description' => 'here description about the plan'
             ],
             [
                 'name' => 'standard',
-                'number_session' => 15,
-                'price' => 10,
-                'is_free' => false,
-                'promo_code' => null,
+                'number_of_session' => 3,
+                'price' => 3.9,
+                'is_primary' => false,
                 'description' => 'here description about the plan'
-
-            ],
-            [
-                'name' => 'free',
-                'number_session' => 1,
-                'promo_code' => 'freeETH',
-                'is_free' => true,
-                'price' => null,
-                'description' => 'here description about the plan'
-
-            ],
-
-
+            ]
         ];
 
 

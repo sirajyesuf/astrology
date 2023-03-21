@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('telegram_user_id');
             $table->string('first_name');
             $table->string('last_name')->nullable();
-            $table->string('handler')->nullable();
-            $table->bigInteger('user_id');
+            $table->string('telegram_handler')->nullable();
             $table->string('email')->unique()->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
