@@ -2,6 +2,40 @@ import datetime
 import logging
 import openai
 
+import config
+
+openai_config = {
+
+    'api_key': config.OPENAI_API_TOKEN,
+    'show_usage': bool(config.SHOW_USAGE),
+    'max_history_size':int(config.MAX_HISTORY_SIZE),
+    'max_conversation_age_minutes': int(config.MAX_CONVERSATION_AGE_MINUTES),
+    'assistant_prompt': config.ASSISTANT_PROMPT,
+    'max_tokens': int(config.MAX_TOKENS),
+
+    # 'gpt-3.5-turbo' or 'gpt-3.5-turbo-0301'
+    'model': 'gpt-3.5-turbo',
+
+    # Number between 0 and 2. Higher values like 0.8 will make the output more random,
+    # while lower values like 0.2 will make it more focused and deterministic.
+    'temperature': 1,
+
+    # How many chat completion choices to generate for each input message.
+    'n_choices': 1,
+
+    # Number between -2.0 and 2.0. Positive values penalize new tokens based on whether
+    # they appear in the text so far, increasing the model's likelihood to talk about new topics.
+    'presence_penalty': 0,
+
+    # Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing
+    # frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
+    'frequency_penalty': 0,
+
+    # The DALL·E generated image size
+    'image_size': '512x512'
+}
+
+
 
 class OpenAIHelper:
     """
@@ -141,3 +175,11 @@ class OpenAIHelper:
             temperature=0.4
         )
         return response.choices[0]['message']['content']
+
+
+
+
+
+
+
+openai_helper = OpenAIHelper(config=openai_config)

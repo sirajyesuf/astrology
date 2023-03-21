@@ -4,7 +4,10 @@ import config
 import time
 import db
 import math
-
+import time
+from pyrogram.types import (InlineKeyboardMarkup,InlineKeyboardButton,ReplyKeyboardMarkup,)
+from pyrogram import enums
+from openai_helper import openai_helper
 def only_for_subscribers(func):
     
     @wraps(func)
@@ -52,19 +55,22 @@ def only_unsubscribers(func):
 
 def has_session(func):
     @wraps(func)
-    async def wrapper(bot,message):
-            user = db.users.find_one(user_id=message.chat.id)
-            subscription = db.subscriptions.find_one(user_id=user['id'],status=1)
-            transaction = db.transactions.find_one(id=subscription['transaction_id'])
-            plan = db.plans.find_one(id=transaction['plan_id'])
-            number_session_in_minute = plan['number_session'] * int(config.ONE_SESSION_IN_MINUTES)
+    async def wrapper(app,message):
+            subscription = db.subscriptions.find_one(telegram_user_id=message.chat.id,status=1)
+            number_session_in_minute = subscription['number_of_session'] * int(config.ONE_SESSION_IN_MINUTES)
             uptime = subscription['uptime']
             if(number_session_in_minute - uptime > 0):
-                return  await func(bot,message)
+                return  await func(app,message)
             else:
-                msg = f"you finished your subscription plan go and buy plan using the bot\n\n@{bot.get_me().username}"
-                await bot.send_message(chat_id = message.chat.id,text=msg)
+                await send_end_of_session_message(app,message)
     return wrapper
+
+
+async def send_end_of_session_message(app,message):
+    prompt = "Write a personalized closing message for the astrology session that takes into account the client's birth chart information and the topics we discussed. Summarize the key points, evoke emotions, and encourage the client to book another session or continue exploring their astrological journey. Include any important insights and lessons from our conversation."
+    answer = openai_helper.get_chat_response(message.chat.id,prompt)
+    await app.send_message(chat_id = message.chat.id,text=answer)
+
 
 
 
@@ -76,11 +82,23 @@ def timeit(func):
     async def timeit_wrapper(app,message):
         start_time = time.perf_counter()
         result = await func(app,message)
+        length_of_word_in_gpt_answer = len(result.split(" "))
+        time.sleep(length_of_word_in_gpt_answer)
         end_time = time.perf_counter()
         total_time = (end_time - start_time) / 60
-
-        user = db.users.find_one(user_id = message.chat.id)
-        user_id = user['id']
-        db.query(f'UPDATE subscriptions SET uptime = uptime + {total_time} WHERE user_id = {user_id} AND  status = 1')
+        
+        #update the uptime of the subscriber
+        db.query(f'UPDATE subscriptions SET uptime = uptime + {total_time} WHERE telegram_user_id = {message.chat.id} AND  status = 1')
         return result
     return timeit_wrapper
+
+
+
+
+def typing(func):
+    @wraps(func)
+    async def wrapper(app,message):
+        await app.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+        await func(app,message)
+
+    return wrapper

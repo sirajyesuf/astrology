@@ -1,50 +1,38 @@
-import config
-# Setup configurations
-openai_config = {
 
-    'api_key': config.OPENAI_API_TOKEN,
-    'show_usage': bool(config.SHOW_USAGE),
-    'max_history_size':int(config.MAX_HISTORY_SIZE),
-    'max_conversation_age_minutes': int(config.MAX_CONVERSATION_AGE_MINUTES),
-    'assistant_prompt': config.ASSISTANT_PROMPT,
-    'max_tokens': int(config.MAX_TOKENS),
-
-    # 'gpt-3.5-turbo' or 'gpt-3.5-turbo-0301'
-    'model': 'gpt-3.5-turbo',
-
-    # Number between 0 and 2. Higher values like 0.8 will make the output more random,
-    # while lower values like 0.2 will make it more focused and deterministic.
-    'temperature': 1,
-
-    # How many chat completion choices to generate for each input message.
-    'n_choices': 1,
-
-    # Number between -2.0 and 2.0. Positive values penalize new tokens based on whether
-    # they appear in the text so far, increasing the model's likelihood to talk about new topics.
-    'presence_penalty': 0,
-
-    # Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing
-    # frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
-    'frequency_penalty': 0,
-
-    # The DALL·E generated image size
-    'image_size': '512x512'
-}
-from openai_helper import OpenAIHelper
-openai_helper = OpenAIHelper(config=openai_config)
 import config
 from pyrogram import Client,filters
 from pyrogram.handlers import MessageHandler,CallbackQueryHandler,RawUpdateHandler
 import config
-from openai_helper import OpenAIHelper
 from pyrogram.types import (InlineKeyboardMarkup,InlineKeyboardButton,ReplyKeyboardMarkup,)
 import db
 import requests
 import json
 from pyrogram.raw import types
 from datetime import datetime,timedelta
-from decorators  import only_for_subscribers,only_for_registered,only_unsubscribers,has_session,timeit
+from decorators  import only_for_subscribers,only_for_registered,only_unsubscribers,has_session,timeit,typing
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import config
+import logging
+from openai_helper import openai_helper
+
+log_format = logging.Formatter(
+    "%(asctime)s - [%(name)s] [%(levelname)s]  %(message)s")
+
+logger = logging.getLogger()
+
+logger.setLevel(logging.INFO)
+file_logger = logging.FileHandler("log")
+file_logger.setLevel(logging.INFO)
+file_logger.setFormatter(log_format)
+logger.addHandler(file_logger)
+console_logger = logging.StreamHandler()
+console_logger.setFormatter(log_format)
+console_logger.setLevel(logging.INFO)
+logger.addHandler(console_logger)
+
+app= Client("astrologer",api_id= config.API_ID,api_hash=config.API_HASH)
+bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.BOT_USERNAME)
+
 
 def job():
     for subscription in db.subscriptions.find(status = 1):
@@ -55,12 +43,13 @@ def job():
             if(plan_num_session_in_min < subscription['uptime']):
                 data = dict(id=subscription['id'],status = 0)
                 db.subscriptions.update(data,['id'])
-
+                
 
 
 async def get_conversation():
     for conv in db.conversations.all():
         return conv
+    
 async def accepte_promocode_func(_, __, query):
         
         print("accepte_promocode_func")
@@ -73,6 +62,7 @@ async def accepte_promocode_func(_, __, query):
 
 
 accepte_promocode_func_filter = filters.create(accepte_promocode_func)
+
 async def add_subscription(app,txt_id,user_id):
     # update the transaction
     db.transactions.update(dict(id=txt_id,status="success"),['id'])
@@ -87,35 +77,35 @@ async def add_subscription(app,txt_id,user_id):
     msg = "Your payment is successfully processed.thanks!\n\n you are now subscribed."
     await app.send_message(chat_id = user_id,text = msg)
 
-async def raw_update_handler_function(app,update,users,chats):
-    try:
-        if type(update) == types.UpdateBotPrecheckoutQuery:
-            #{
-            # "_": "types.UpdateBotPrecheckoutQuery",
-            # "query_id": 1672406644428380219,
-            # "user_id": 389387515,
-            # "payload": "b'17'",
-            # "currency": "USD",
-            # "total_amount": 300
-            #}
-            if(db.transactions.count(id=update.payload,status='pending')):
-                url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=true"
-            else:
-                url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=false"
+# async def raw_update_handler_function(app,update,users,chats):
+#     try:
+#         if type(update) == types.UpdateBotPrecheckoutQuery:
+#             #{
+#             # "_": "types.UpdateBotPrecheckoutQuery",
+#             # "query_id": 1672406644428380219,
+#             # "user_id": 389387515,
+#             # "payload": "b'17'",
+#             # "currency": "USD",
+#             # "total_amount": 300
+#             #}
+#             if(db.transactions.count(id=update.payload,status='pending')):
+#                 url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=true"
+#             else:
+#                 url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=false"
 
-            requests.post(url)
+#             requests.post(url)
         
-        if(type(update.message.action) == types.MessageActionPaymentSentMe):
-            txt_id = update.message.action.payload
-            if(txt_id):
-                user_id = update.message.peer_id.user_id
-                await add_subscription(app,txt_id,user_id)
+#         if(type(update.message.action) == types.MessageActionPaymentSentMe):
+#             txt_id = update.message.action.payload
+#             if(txt_id):
+#                 user_id = update.message.peer_id.user_id
+#                 await add_subscription(app,txt_id,user_id)
 
-    except AttributeError:
-        pass
+#     except AttributeError:
+#         pass
 
 
-raw_update_handler_function_handler = RawUpdateHandler(callback=raw_update_handler_function)
+# raw_update_handler_function_handler = RawUpdateHandler(callback=raw_update_handler_function)
 
 @only_for_registered
 async def display_plan(bot,message):
@@ -277,63 +267,96 @@ async def start(bot,message):
 
 start_handler = MessageHandler(start,filters=filters.command('start'))
 
-async def post(bot,message):
-        _bot =  await bot.get_me()
-        text="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum"
+async def send_welcome_message_to_the_client_job():
+    for subscription in db.subscriptions.find(welcome_message_sent = False):
+        # send welcome message
+        print("welcome message for new subscription")
+        print(subscription)
+        text = """
+        Hi there,
+
+        I'm an experienced astrologer, and I'm excited to connect with you on Telegram! I understand that astrology can be a powerful tool for gaining insight and guidance in life, and I'm here to help you navigate the stars.
+
+        My approach is empathetic and focused on helping you find the answers you're seeking. Whether you want to gain insight into your current situation or need guidance about the future, I'm here to help.
+
+        To start a session, simply click "START," and we can begin whenever you're ready. And don't hesitate to reach out whenever you need guidance - I'm available 24/7 to accommodate your schedule.
+
+        I'm looking forward to helping you discover the power of astrology and guiding you on your journey. Let's get started! 🔮✨
+        """
+
+        button= InlineKeyboardMarkup(
+        [
+        [
+        InlineKeyboardButton(
+        "Start Session",
+        callback_data="start_session"
+        )
+        ]
+        ]
+        )
+        response = await app.send_message(
+        chat_id= subscription['telegram_user_id'],
+        text =  text,
+        reply_markup= button
+        )
+
+        if(response):
+            db.subscriptions.update(dict(id=int(subscription['id']),welcome_message_sent=True),['id'])
+
+
+
+async def attach_button_for_pinned_post(bot,message):
+        text = message.pinned_message.text
+        message_id = message.pinned_message.id
+        stripe_payment_url = config.STRIPE_PAYMENT_LINK
+        print(stripe_payment_url)
+
         button= InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
                                 "Start Session",
-                                url = f"http://t.me/{config.ASTROLOGER_TELEGRAM_HANDLER}"
-                            ),
-                            InlineKeyboardButton(
-                                "Add Account",
-                                url = f"http://t.me/{_bot.username}?start=add_acount"
-                            ),
+                                url = f"{stripe_payment_url}"
+                            )
                         ]
                     ]
         )
 
-        await bot.send_message(chat_id=int(config.CHANNEL_ID),text=text,reply_markup=button)
+        await bot.edit_message_reply_markup(
+            chat_id = int(config.CHANNEL_ID),
+            message_id = message_id,
+            reply_markup = button
+        )
+attach_button_for_pinned_post_handler = MessageHandler(callback=attach_button_for_pinned_post,filters=filters.pinned_message)
 
-post_handler = MessageHandler(post,filters=filters.command('post'))
 
-
-@only_for_registered
-@only_for_subscribers
+# @only_for_registered
+# @only_for_subscribers
 @has_session
+@typing
 @timeit
 async def  prompt(app,message):
-    result = openai_helper.get_chat_response(message.chat.id,message.text)
-    response = await app.send_message(chat_id = message.chat.id,text=result)
-    return response
+    return openai_helper.get_chat_response(message.chat.id,message.text)
+    
 
 prompt_handler = MessageHandler(prompt,filters=filters.text & filters.private & ~filters.bot & filters.incoming & ~filters.group & ~ filters.channel)
 
-class Astrologer:
 
 
-    def __init__(self,config:dict) -> None:
-        self.config = config
-    
-    def run(self):
-        app= Client("astrologer",api_id= self.config['api_id'],api_hash=self.config['api_hash'])
-        bot=Client("bot",api_id=self.config['api_id'],api_hash=self.config['api_hash'],bot_token=self.config['bot_token'])
-
-        scheduler = AsyncIOScheduler()
-        scheduler.add_job(job, "interval", seconds=int(config.SCHEDULER_INTERVAL_IN_SECONDS))
-        scheduler.start()
-        app.add_handler(prompt_handler)
-        bot.add_handler(start_handler)
-        bot.add_handler(post_handler)
-        bot.add_handler(display_plan_handler)
-        bot.add_handler(user_plan_preference_handler)
-        bot.add_handler(account_detail_handler)
-        bot.add_handler(accepte_promo_code_handler)
-        bot.add_handler(raw_update_handler_function_handler)
-        app.start()
-        bot.run()
+scheduler = AsyncIOScheduler()
+# scheduler.add_job(job, "interval", seconds=int(config.SCHEDULER_INTERVAL_IN_SECONDS))
+# scheduler.add_job(send_welcome_message_to_the_client_job,'interval',seconds=int(config.SCHEDULER_INTERVAL_IN_SECONDS))
+# scheduler.start()
+app.add_handler(prompt_handler)
+bot.add_handler(start_handler)
+bot.add_handler(attach_button_for_pinned_post_handler)
+# bot.add_handler(display_plan_handler)
+# bot.add_handler(user_plan_preference_handler)
+# bot.add_handler(account_detail_handler)
+# bot.add_handler(accepte_promo_code_handler)
+# bot.add_handler(raw_update_handler_function_handler)
+app.start()
+bot.run()
 
 
 
