@@ -1,4 +1,5 @@
 
+from enums import Status
 import config
 from pyrogram import Client,filters
 from pyrogram.handlers import MessageHandler,CallbackQueryHandler,RawUpdateHandler
@@ -9,12 +10,12 @@ import requests
 import json
 from pyrogram.raw import types
 from datetime import datetime,timedelta
-from decorators  import only_for_subscribers,only_for_registered,only_unsubscribers,has_session,timeit,typing
+from decorators  import only_for_subscribers,register,only_unsubscribers,has_session,timeit,typing
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import config
 import logging
 from openai_helper import openai_helper
-
+from datetime import datetime
 log_format = logging.Formatter(
     "%(asctime)s - [%(name)s] [%(levelname)s]  %(message)s")
 
@@ -32,6 +33,7 @@ logger.addHandler(console_logger)
 
 app= Client("astrologer",api_id= config.API_ID,api_hash=config.API_HASH)
 bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.BOT_USERNAME)
+
 
 
 def job():
@@ -63,51 +65,47 @@ async def accepte_promocode_func(_, __, query):
 
 accepte_promocode_func_filter = filters.create(accepte_promocode_func)
 
-async def add_subscription(app,txt_id,user_id):
-    # update the transaction
-    db.transactions.update(dict(id=txt_id,status="success"),['id'])
-    data = dict(
-        transaction_id = txt_id,
-        start_date=datetime.now(),
-        due_date=datetime.now() + timedelta(days=30),
-        uptime = 0
-    )
-    db.subscriptions.insert(data)
-
+async def activate_the_subscription(app,subscription_id,user_id):
+    data = dict(id=subscription_id,status = Status.ACTIVE.value)
+    db.subscriptions.update(data,['id'])
     msg = "Your payment is successfully processed.thanks!\n\n you are now subscribed."
     await app.send_message(chat_id = user_id,text = msg)
 
-# async def raw_update_handler_function(app,update,users,chats):
-#     try:
-#         if type(update) == types.UpdateBotPrecheckoutQuery:
-#             #{
-#             # "_": "types.UpdateBotPrecheckoutQuery",
-#             # "query_id": 1672406644428380219,
-#             # "user_id": 389387515,
-#             # "payload": "b'17'",
-#             # "currency": "USD",
-#             # "total_amount": 300
-#             #}
-#             if(db.transactions.count(id=update.payload,status='pending')):
-#                 url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=true"
-#             else:
-#                 url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=false"
+async def raw_update_handler_function(app,update,users,chats):
+    print(update)
+    try:
+        if type(update) == types.UpdateBotPrecheckoutQuery:
 
-#             requests.post(url)
+            #{
+            # "_": "types.UpdateBotPrecheckoutQuery",
+            # "query_id": 1672406644428380219,
+            # "user_id": 389387515,
+            # "payload": "b'17'",
+            # "currency": "USD",
+            # "total_amount": 300
+            #}
+
+            if(db.subscriptions.count(id=int(update.payload),status=Status.PENDING.value)):
+                url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=true"
+            else:
+                url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery?pre_checkout_query_id={update.query_id}&ok=false"
+
+            r = requests.post(url)
+
+            print(r.text)
         
-#         if(type(update.message.action) == types.MessageActionPaymentSentMe):
-#             txt_id = update.message.action.payload
-#             if(txt_id):
-#                 user_id = update.message.peer_id.user_id
-#                 await add_subscription(app,txt_id,user_id)
+        if(type(update.message.action) == types.MessageActionPaymentSentMe):
+            subscription_id = update.message.action.payload
+            if(subscription_id):
+                user_id = update.message.peer_id.user_id
+                await activate_the_subscription(app,subscription_id,user_id)
 
-#     except AttributeError:
-#         pass
+    except AttributeError:
+        pass
 
 
-# raw_update_handler_function_handler = RawUpdateHandler(callback=raw_update_handler_function)
+raw_update_handler_function_handler = RawUpdateHandler(callback=raw_update_handler_function)
 
-@only_for_registered
 async def display_plan(bot,message):
     chat = message.chat
     plans ="--- Plan ---\n\n"
@@ -136,34 +134,48 @@ async def display_plan(bot,message):
 display_plan_handler = MessageHandler(callback=display_plan,filters=filters.regex('Plan'))
 
 
-async def send_invoice(app,callback_query):
-    # create the transaction
-    db_user = db.users.find_one(user_id=callback_query.message.chat.id)
-    plan =  db.plans.find_one(id=callback_query.data)
-
-    txt = {
+async def send_invoice(message):
+    # create the subscription
+    db_user = db.users.find_one(telegram_user_id=message.chat.id)
+    plan =  db.plans.find_one(is_primary = 1)
+    subscription = db.subscriptions.count(status = Status.PENDING.value,plan_id = plan['id'])
+    if(subscription == 0):
+        subscription = {
         'user_id':db_user['id'],
         'plan_id':plan['id'],
-        'status':'pending'
-    }
-    txt_id = db.transactions.insert(txt)
-    pt = "284685063:TEST:NmMzNTI3NTdkNWJm"
-    prices = [{"label": plan['name'], "amount": plan['price']*100}]
+        'status': Status.PENDING.value,
+        'uptime': 0,
+        'welcome_message_sent':False,
+        'created_at': datetime.now(),
+        'updated_at' :datetime.now()
+        }
+        subscription_id = db.subscriptions.insert(subscription)
+    else:
+        subscription = db.subscriptions.find_one(status = Status.PENDING.value,plan_id = plan['id'])
+
+        subscription_id = subscription['id']
+
+
+
+    prices = [{"label": plan['name'], "amount": int(plan['price'])*100}]
     prices_json = json.dumps(prices)
     invoice = {
-        'chat_id' : callback_query.message.chat.id,
+        'chat_id' : message.chat.id,
         'title':plan['name'],
         'description':plan['description'],
-        'payload':str(txt_id),
-        'provider_token':pt,
+        'payload':str(subscription_id),
+        'provider_token':config.PAYMENT_PROVIDER_TOKEN,
         'currency':'USD',
         'prices':prices_json,
-        'start_parameter': str(txt_id)
+        'start_parameter': str(subscription_id)
     }
 
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendInvoice"
 
     r = requests.post(url,data=invoice)
+    # message_id = r.json()['result']['message_id']
+
+    
 
 
 async def accepte_promo_code(bot,message):
@@ -227,36 +239,59 @@ user_plan_preference_handler = CallbackQueryHandler(user_plan_preference,filters
 
 
 async def account_detail(bot,message):
-    account_detail = "\t\tAccount Detail\t\t\n\n"
-    user = db.users.find_one(user_id=message.chat.id)
-    plan_name = "No Active Plan"
-    subscription = db.subscriptions.count(user_id=int(user['id']),status = True)
+    account_detail = "\tPlan Detail\t\t\n\n"
+    user = db.users.find_one(telegram_user_id=message.chat.id)
+
+    subscription = db.subscriptions.count(user_id=int(user['id']),status = Status.ACTIVE.value)
     if(subscription):
-        subscription = db.subscriptions.find_one(user_id=int(user['id']),status = True)
-        transaction = db.transactions.find_one(id=int(subscription['transaction_id']))
-        plan = db.plans.find_one(id=int(transaction['plan_id']))
+        subscription = db.subscriptions.find_one(user_id=int(user['id']),status = Status.ACTIVE.value)
+        plan = db.plans.find_one(id=int(subscription['plan_id']))
         plan_name = plan['name']
+        plan_num_session = plan ['number_of_session']
+        uptime = subscription['uptime']
+        button= InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                "Start Session",
+                url=f"t.me/{config.ASTROLOGER_TELEGRAM_HANDLER}"
+                )
+            ]
+        ]
+        )
 
-    
-    fn = user['first_name']
-    ln = user.get('last_name',None)
-    account_detail = account_detail + f"First Name: {fn}\n" + f"Last Name: {ln}\n" + f"Plan: {plan_name}"
+        account_detail = account_detail + f"Plan: {plan_name}\nNumber of Session:{plan_num_session}\nRemaining Number of Session: {plan_num_session-(uptime//60)} sessions only"
 
-    await bot.send_message(chat_id = message.chat.id,text = account_detail)
+        response = await bot.send_message(chat_id = message.chat.id,text = account_detail,reply_markup = button)
+
+        # db.messages.insert({
+        # 'telegram_user_id':message.chat.id,
+        # 'message_id':None,
+        # 'start_session_message_id': response.message_id,
+        # 'is_close_session_button_sent' :False
+        # })
+
+    else:
+        await bot.send_message(chat_id = message.chat.id,text = "sorry! you dont have active subscription.please buy a new one.")
+        await send_invoice(message)
+
+
+
+
+
 
 account_detail_handler = MessageHandler(callback=account_detail,filters=filters.regex("Account"))
 
+
+@register
 async def start(bot,message):
-    # send the main menu
-    main_menu = ReplyKeyboardMarkup(
-                [
-                    ["Account", "Plan"],
-                    ["Help","About Us"],
-               
-                ],
-                resize_keyboard=True
-            )
-    await bot.send_message(chat_id = message.chat.id,text = "hello wellcome back!",reply_markup = main_menu)
+    query =  message.text.split(" ")[1] if len(message.text.split(" ")) == 2 else None
+    await bot.send_message(chat_id = message.chat.id,text = f"wellcome {message.chat.first_name}")
+
+    if(query == "buy_session"):
+        await send_invoice(message)
+    if(query == "start_session"):
+        await account_detail(bot,message)
 
 
 
@@ -306,17 +341,22 @@ async def send_welcome_message_to_the_client_job():
 
 
 async def attach_button_for_pinned_post(bot,message):
-        text = message.pinned_message.text
+        _bot = await bot.get_me()
+
         message_id = message.pinned_message.id
-        stripe_payment_url = config.STRIPE_PAYMENT_LINK
-        print(stripe_payment_url)
 
         button= InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
                                 "Start Session",
-                                url = f"{stripe_payment_url}"
+                                url = f"t.me/{_bot.username}?start=start_session"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "Buy Session",
+                                url = f"t.me/{_bot.username}?start=buy_session"
                             )
                         ]
                     ]
@@ -327,14 +367,16 @@ async def attach_button_for_pinned_post(bot,message):
             message_id = message_id,
             reply_markup = button
         )
+
 attach_button_for_pinned_post_handler = MessageHandler(callback=attach_button_for_pinned_post,filters=filters.pinned_message)
 
 
 # @only_for_registered
 # @only_for_subscribers
-@has_session
+# @has_session
+
 @typing
-@timeit
+@timeit(bot)
 async def  prompt(app,message):
     return openai_helper.get_chat_response(message.chat.id,message.text)
     
