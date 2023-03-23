@@ -30,7 +30,13 @@ class SubscriptionsRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id'),
+                Tables\Columns\TextColumn::make('plan.name'),
+                Tables\Columns\BadgeColumn::make('status')
+                ->enum([
+                    1 => 'Pending',
+                    2 => 'Active',
+                    3 => 'DeActive'
+                ])
             ])
             ->filters([
                 //
@@ -39,11 +45,11 @@ class SubscriptionsRelationManager extends RelationManager
                 // Tables\Actions\CreateAction::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                // Tables\Actions\EditAction::make(),
+                // Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+                // Tables\Actions\DeleteBulkAction::make(),
             ]);
     }    
 }

@@ -25,7 +25,8 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                //
+                Forms\Components\TextInput::make("first_name"),
+                Forms\Components\TextInput::make("last_name"),
             ]);
     }
 
@@ -45,14 +46,15 @@ class UserResource extends Resource
                 // Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+                // Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
     
     public static function getRelations(): array
     {
         return [
-            UserResource\RelationManagers\SubscriptionsRelationManager::class
+            UserResource\RelationManagers\SubscriptionsRelationManager::class,
+            UserResource\RelationManagers\HistoriesRelationManager::class
         ];
     }
     
@@ -63,5 +65,11 @@ class UserResource extends Resource
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
-    }    
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return User::where("email",null);
+    }
+    
 }

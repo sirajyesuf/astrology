@@ -11,6 +11,8 @@ from openai_helper import openai_helper
 from datetime import datetime
 from enums import Status
 from pyrogram import errors
+
+
 def only_for_subscribers(func):
     
     @wraps(func)
@@ -48,12 +50,12 @@ def register(func):
 def only_unsubscribers(func):
     @wraps(func)
     async def wrapper(bot,message):
-            user = db.users.find_one(user_id=message.chat.id)
-            subscription = db.subscriptions.count(user_id=user['id'],status=1)
+            user = db.users.find_one(telegram_user_id=message.chat.id)
+            subscription = db.subscriptions.count(user_id=user['id'],status=Status.ACTIVE.value)
             if(subscription == 0):
                 return  await func(bot,message)
             else:
-                msg = "you are already subscribed"
+                msg = "you are already subscribed."
                 await bot.send_message(chat_id = message.chat.id,text=msg)
     return wrapper
 
@@ -62,8 +64,10 @@ def only_unsubscribers(func):
 def has_session(func):
     @wraps(func)
     async def wrapper(app,message):
-            subscription = db.subscriptions.find_one(telegram_user_id=message.chat.id,status=1)
-            number_session_in_minute = subscription['number_of_session'] * config.ONE_SESSION_IN_MINUTES
+            user = db.users.find_one(telegram_user_id = message.chat.id)
+            subscription = db.subscriptions.find_one(user_id = user['id'],status=Status.ACTIVE.value)
+            plan = db.plans.find_one(id = subscription['plan_id'])
+            number_session_in_minute = plan['number_of_session'] * config.ONE_SESSION_IN_MINUTES
             uptime = subscription['uptime']
             if((number_session_in_minute - uptime) > 0):
                 return  await func(app,message)
@@ -73,7 +77,7 @@ def has_session(func):
 
 
 async def send_end_of_session_message(app,message):
-    prompt = "Write a personalized closing message for the astrology session that takes into account the client's birth chart information and the topics we discussed. Summarize the key points, evoke emotions, and encourage the client to book another session or continue exploring their astrological journey. Include any important insights and lessons from our conversation."
+    prompt = db.get_setting()
     answer = openai_helper.get_chat_response(message.chat.id,prompt)
     await app.send_message(chat_id = message.chat.id,text=answer)
 

@@ -30,13 +30,16 @@ class HistoriesRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id'),
+            
+                Tables\Columns\TextColumn::make('prompt'),
+                Tables\Columns\TextColumn::make('answer'),
+
             ])
             ->filters([
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                // Tables\Actions\CreateAction::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

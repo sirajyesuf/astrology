@@ -8,4 +8,10 @@ subscriptions = db['subscriptions']
 conversations = db['conversations']
 messages = db['messages']
 histories = db['histories']
+settings = db['settings']
 query = db.query
+
+
+def get_setting():
+    for setting in settings.all():
+        return setting
