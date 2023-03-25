@@ -10,7 +10,7 @@ import requests
 import json
 from pyrogram.raw import types
 from datetime import datetime,timedelta
-from decorators  import only_for_subscribers,register,only_unsubscribers,has_session,timeit,typing
+from decorators  import only_for_subscribers,register,only_unsubscribers,has_session,timeit,typing,registered
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import config
 import logging
@@ -32,7 +32,7 @@ console_logger.setLevel(logging.INFO)
 logger.addHandler(console_logger)
 
 app= Client("astrologer",api_id= config.API_ID,api_hash=config.API_HASH)
-bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.BOT_USERNAME)
+bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.TELEGRAM_BOT_TOKEN)
 
 
 
@@ -238,13 +238,36 @@ async def user_plan_preference(bot,callback_query):
 user_plan_preference_handler = CallbackQueryHandler(user_plan_preference,filters=filters.regex("1|2|3"))
 
 
+async def close_session(bot,callback_query):
+    print(callback_query.data)
+    db.messages.delete()
+    try:
+        end_session_prompt = db.get_setting()['end_of_session_prompt']
+        answer = openai_helper.get_chat_response(callback_query.from_user.id,end_session_prompt)
+        await bot.delete_messages(
+            chat_id = callback_query.from_user.id,
+            message_ids = callback_query.message.id
+        )
+
+        await bot.send_message(
+            chat_id = callback_query.from_user.id,
+            text = answer
+        )
+    except:
+        pass
+
+
+    
+ 
+
+close_session_handler = CallbackQueryHandler(callback=close_session,filters=filters.regex('close_session'))
 
 
 
 
 
 async def account_detail(bot,message):
-    account_detail = "\tPlan Detail\t\t\n\n"
+    account_detail = "Plan Detail\n"
     user = db.users.find_one(telegram_user_id=message.chat.id)
 
     subscription = db.subscriptions.count(user_id=int(user['id']),status = Status.ACTIVE.value)
@@ -262,10 +285,10 @@ async def account_detail(bot,message):
                 url=f"t.me/{config.ASTROLOGER_TELEGRAM_HANDLER}"
                 )
             ]
-        ]
+        ] 
         )
 
-        account_detail = account_detail + f"Plan: {plan_name}\nNumber of Session:{plan_num_session}\nRemaining Number of Session: {plan_num_session-(uptime//60)} sessions only"
+        account_detail = account_detail + f"Plan: {plan_name}\nNumber of Session:{plan_num_session}\nRemaining Number of Session: {plan_num_session-(uptime//60)} sessions only\n\nNote\n one session is {config.ONE_SESSION_IN_MINUTES} minutes only."
 
         await bot.send_message(chat_id = message.chat.id,text = account_detail,reply_markup = button)
 
@@ -295,8 +318,19 @@ async def start(bot,message):
     if(query == "start_session"):
         await account_detail(bot,message)
 
+async def main_menu(bot,message):
+    menu = message.text
+
+    if(menu == "Start Session"):
+        await account_detail(bot,message)
+    if(menu == "Buy Session"):
+        await  send_invoice(bot,message)
 
 
+
+
+
+main_menu_handler = MessageHandler(callback=main_menu,filters=filters.regex("Start Session|Buy Session"))
 
 
 
@@ -375,7 +409,8 @@ attach_button_for_pinned_post_handler = MessageHandler(callback=attach_button_fo
 
 # @only_for_registered
 # @only_for_subscribers
-@register
+@registered(bot)
+@only_for_subscribers(bot)
 @has_session
 @typing
 @timeit(bot)
@@ -396,8 +431,8 @@ bot.add_handler(start_handler)
 bot.add_handler(attach_button_for_pinned_post_handler)
 # bot.add_handler(display_plan_handler)
 # bot.add_handler(user_plan_preference_handler)
-# bot.add_handler(account_detail_handler)
-# bot.add_handler(accepte_promo_code_handler)
+bot.add_handler(main_menu_handler)
+bot.add_handler(close_session_handler)
 bot.add_handler(raw_update_handler_function_handler)
 app.start()
 bot.run()

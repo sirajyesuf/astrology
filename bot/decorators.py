@@ -13,28 +13,29 @@ from enums import Status
 from pyrogram import errors
 
 
-def only_for_subscribers(func):
-    
-    @wraps(func)
-    async def wrapper(bot,message):
-            user = db.users.find_one(user_id=message.chat.id)
-            print(user)
-            subscription = db.subscriptions.count(user_id=user['id'],status=1)
+def only_for_subscribers(bot):
+    def wrapper(func):
+        @wraps(func)
+        async def inner_wrapper(app,message):
+            _bot = await bot.get_me()
+            user = db.users.find_one(telegram_user_id=message.chat.id)
+            subscription = db.subscriptions.count(user_id=user['id'],status=Status.ACTIVE.value)
+            
             if(subscription):
-                return  await func(bot,message)
+                return  await func(app,message)
             else:
-                msg = f"you dont have active subscription.use this bot to buy a subscription.\n\n {config.BOT_USERNAME}"
-                await bot.send_message(chat_id = message.chat.id,text=msg)
+                msg = f"you dont have active subscription.use this bot to buy a subscription.\n\n @{_bot.username}"
+                await app.send_message(chat_id = message.chat.id,text=msg)
+        return inner_wrapper
     return wrapper
-
 
 def register(func):
     @wraps(func)
     async def wrapper(bot,message):
+            print(message)
             user = db.users.find_one(telegram_user_id=message.chat.id)
             if(user is  None):
                 user = {
-                
                     'first_name' : message.chat.first_name,
                     'last_name': message.chat.last_name,
                     'telegram_user_id' : message.chat.id,
@@ -46,6 +47,22 @@ def register(func):
             await func(bot,message)
     return wrapper
 
+def registered(bot):
+    def wrapper(func):
+        @wraps(func)
+        async def inner_wrapper(app,message):
+            _bot = await bot.get_me()
+            user = db.users.find_one(telegram_user_id=message.chat.id)
+            if(user is  None):
+                text = f"you dont have active Subscription {message.chat.first_name}. use this bot to buy a subscription.\n\n @{_bot.username}"
+                await app.send_message(
+                    chat_id = message.chat.id,
+                    text = text
+                )
+            else:
+                await func(app,message)
+        return inner_wrapper
+    return wrapper
 
 def only_unsubscribers(func):
     @wraps(func)
@@ -115,7 +132,7 @@ def timeit(bot):
             
             #update the uptime and  number of prompt  of the subscriber
             db.query(f'UPDATE subscriptions SET uptime = uptime + {total_time} WHERE user_id = {user["id"]} AND  status = 2')
-            if(subscription['number_of_propmt'] >= 5):
+            if(subscription['number_of_propmt'] >= 1):
                 db.subscriptions.update(dict(id=subscription['id'],number_of_propmt = 0),['id'])
                 remaning_sessions_in_minutes = math.ceil(int(plan ['number_of_session'] * config.ONE_SESSION_IN_MINUTES)  - subscription['uptime'])
                 await  countdown(bot,message,remaning_sessions_in_minutes)
@@ -124,8 +141,6 @@ def timeit(bot):
 
         return inner_wrapper
     return wrapper
-
-
 
 
 def typing(func):
@@ -139,16 +154,36 @@ def typing(func):
 
 
 async def countdown(bot,message,remaning_sessions_in_minutes):
+        
+        button= InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "❌ Close Session",
+                                callback_data="close_session"
+                            )
+                        ]
+                    ]
+        )
 
         messages = db.messages.count(telegram_user_id = message.chat.id)
         if(messages):
             messages = db.messages.find_one(telegram_user_id = message.chat.id)
             try:
-                await bot.edit_message_text(chat_id=message.chat.id,message_id=messages['message_id'] ,text=f"#Remaing Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.")
+                await bot.edit_message_text(
+                    chat_id=message.chat.id,
+                    message_id=messages['message_id'],
+                    text=f"#Remaing Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+                    reply_markup = button
+                    )
             except errors.exceptions.bad_request_400.MessageNotModified:
                 print(remaning_sessions_in_minutes)
         else:
-            response = await bot.send_message(chat_id = message.chat.id,text=f"#Remaing Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.")
+            response = await bot.send_message(
+                chat_id = message.chat.id,
+                text=f"#Remaing Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+                reply_markup = button
+                )
             db.messages.insert({
             'telegram_user_id':message.chat.id,
             'message_id':response.id,

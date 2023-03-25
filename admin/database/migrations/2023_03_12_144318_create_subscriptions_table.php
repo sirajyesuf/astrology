@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('plan_id');
-            $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('plan_id')->references('id')->on('plans');
             $table->integer('status');
             $table->bigInteger('uptime');

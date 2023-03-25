@@ -20,9 +20,8 @@ class HistoriesRelationManager extends RelationManager
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('id')
-                    ->required()
-                    ->maxLength(255),
+              //
+
             ]);
     }
 
@@ -42,7 +41,7 @@ class HistoriesRelationManager extends RelationManager
                 // Tables\Actions\CreateAction::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                // Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([

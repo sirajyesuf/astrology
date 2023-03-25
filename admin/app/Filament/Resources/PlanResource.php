@@ -30,7 +30,6 @@ class PlanResource extends Resource
                 ->rows(2)
                 ->cols(2),
                 Forms\Components\Checkbox::make('is_primary'),
-
             ]);
     }
 
@@ -43,17 +42,17 @@ class PlanResource extends Resource
                 Tables\Columns\TextColumn::make("price"),
                 Tables\Columns\TextColumn::make("is_primary"),
                 Tables\Columns\TextColumn::make("description"),
-
-
             ])
             ->filters([
-                //
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),
+                Tables\Actions\ForceDeleteBulkAction::make(),
+                Tables\Actions\RestoreBulkAction::make(),
             ]);
     }
     
@@ -72,4 +71,12 @@ class PlanResource extends Resource
             'edit' => Pages\EditPlan::route('/{record}/edit'),
         ];
     }    
+    
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
+            ]);
+    }
 }
