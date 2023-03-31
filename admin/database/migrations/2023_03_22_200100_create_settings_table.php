@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->text("end_of_session_prompt")->nullable();
             $table->text("start_of_session_prompt")->nullable();
+            $table->text("end_of_all_sessions_propmt")->nullable();
+            $table->text("astrologer_contact_prompt")->nullable();
             $table->timestamps();
         });
     }

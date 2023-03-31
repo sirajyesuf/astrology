@@ -113,19 +113,19 @@ class OpenAIHelper:
                 return answer
             else:
                 logging.error('No response from GPT-3')
-                return "⚠️ _An error has occurred_ ⚠️\nPlease try again in a while."
+                # return "⚠️ _An error has occurred_ ⚠️\nPlease try again in a while."
 
         except openai.error.RateLimitError as e:
             logging.exception(e)
-            return f"⚠️ _OpenAI Rate Limit exceeded_ ⚠️\n{str(e)}"
+            # return f"⚠️ _OpenAI Rate Limit exceeded_ ⚠️\n{str(e)}"
 
         except openai.error.InvalidRequestError as e:
             logging.exception(e)
-            return f"⚠️ _OpenAI Invalid request_ ⚠️\n{str(e)}"
+            # return f"⚠️ _OpenAI Invalid request_ ⚠️\n{str(e)}"
 
         except Exception as e:
             logging.exception(e)
-            return f"⚠️ _An error has occurred_ ⚠️\n{str(e)}"
+            # return f"⚠️ _An error has occurred_ ⚠️\n{str(e)}"
 
 
 

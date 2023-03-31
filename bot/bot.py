@@ -10,12 +10,13 @@ import requests
 import json
 from pyrogram.raw import types
 from datetime import datetime,timedelta
-from decorators  import only_for_subscribers,register,only_unsubscribers,has_session,timeit,typing,registered
+from decorators  import only_for_subscribers,register,only_unsubscribers,has_session,timeit,typing,registered,set_used_session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import config
 import logging
 from openai_helper import openai_helper
 from datetime import datetime
+import time
 log_format = logging.Formatter(
     "%(asctime)s - [%(name)s] [%(levelname)s]  %(message)s")
 
@@ -36,42 +37,52 @@ bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.
 
 
 
-def job():
-    for subscription in db.subscriptions.find(status = 1):
-        if(subscription):
-            transaction = db.transactions.find_one(id = subscription['transaction_id'])
-            plan = db.plans.find_one(id = transaction['plan_id'])
-            plan_num_session_in_min = plan['number_session'] * int(config.ONE_SESSION_IN_MINUTES)
-            if(plan_num_session_in_min < subscription['uptime']):
-                data = dict(id=subscription['id'],status = 0)
-                db.subscriptions.update(data,['id'])
+# def job():
+#     for subscription in db.subscriptions.find(status = 1):
+#         if(subscription):
+#             transaction = db.transactions.find_one(id = subscription['transaction_id'])
+#             plan = db.plans.find_one(id = transaction['plan_id'])
+#             plan_num_session_in_min = plan['number_session'] * int(config.ONE_SESSION_IN_MINUTES)
+#             if(plan_num_session_in_min < subscription['uptime']):
+#                 data = dict(id=subscription['id'],status = 0)
+#                 db.subscriptions.update(data,['id'])
                 
 
 
-async def get_conversation():
-    for conv in db.conversations.all():
-        return conv
+# async def get_conversation():
+#     for conv in db.conversations.all():
+#         return conv
     
-async def accepte_promocode_func(_, __, query):
+# async def accepte_promocode_func(_, __, query):
         
-        print("accepte_promocode_func")
-        print(query)
-        conv=await get_conversation()
-        if(conv is not None):
-            if(conv['que'] == "free_plan"):
-                return True
-        return False
+#         print("accepte_promocode_func")
+#         print(query)
+#         conv=await get_conversation()
+#         if(conv is not None):
+#             if(conv['que'] == "free_plan"):
+#                 return True
+#         return False
 
 
-accepte_promocode_func_filter = filters.create(accepte_promocode_func)
+# accepte_promocode_func_filter = filters.create(accepte_promocode_func)
 
-async def activate_the_subscription(app,subscription_id,user_id):
+async def activate_the_subscription(subscription_id,user_id):
+
     data = dict(id=subscription_id,status = 2)
     db.subscriptions.update(data,['id'])
     msg = "Your payment for the subscription has been successfully processed."
-    await app.send_message(chat_id = user_id,text = msg)
+    await bot.send_message(chat_id = user_id,text = msg)
 
-async def raw_update_handler_function(app,update,users,chats):
+
+    # send start of session prompt
+    start_of_session_prompt = db.get_setting()['astrologer_contact_prompt']
+    answer = openai_helper.get_chat_response(user_id,start_of_session_prompt)
+    # length_of_words_in_gpt_answer = len(answer.split(" "))
+    # time.sleep(length_of_words_in_gpt_answer)
+    await app.send_message(chat_id = user_id,text = answer)
+
+
+async def raw_update_handler_function(bot,update,users,chats):
     # print(update)
     try:
         if type(update) == types.UpdateBotPrecheckoutQuery:
@@ -99,7 +110,7 @@ async def raw_update_handler_function(app,update,users,chats):
             subscription_id = int(update.message.action.payload)
             if(subscription_id):
                 user_id = update.message.peer_id.user_id
-                await activate_the_subscription(app,subscription_id,user_id)
+                await activate_the_subscription(subscription_id,user_id)
 
     except AttributeError:
         pass
@@ -147,10 +158,11 @@ async def send_invoice(bot,message):
         'user_id':db_user['id'],
         'plan_id':plan['id'],
         'status': Status.PENDING.value,
-        'uptime': 0,
-        'welcome_message_sent':False,
+        'used_sessions': 0,
+        'first_message_datetime' : datetime.now(),
+        'final_message_datetime' :  datetime.now(),
         'created_at': datetime.now(),
-        'updated_at' :datetime.now()
+        'updated_at' :datetime.now(),
         }
         subscription_id = db.subscriptions.insert(subscription)
     else:
@@ -176,39 +188,38 @@ async def send_invoice(bot,message):
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendInvoice"
 
     r = requests.post(url,data=invoice)
-    # message_id = r.json()['result']['message_id']
 
     print(r.text)
 
     
 
 
-async def accepte_promo_code(bot,message):
-    user = db.users.find_one()
-    promo_code = message.text
-    plan = db.plans.find_one(is_free=True)
-    conv  = await get_conversation()
-    if(promo_code == plan['promo_code']):    
-        user = db.users.find_one(user_id=message.chat.id)
-        db.transactions.update(dict(id=int(conv['txt_id']),status="success"),['id'])
-        data = dict(
-            user_id =  int(user['id']),
-            transaction_id = int(conv['txt_id']),
-            start_date=datetime.now(),
-            due_date=datetime.now() + timedelta(days=30),
-            uptime = 0
-        )
-        db.subscriptions.insert(data)
-        await bot.send_message(chat_id = message.chat.id,text="you are successfully subscribed.enjoy it.")
+# async def accepte_promo_code(bot,message):
+#     user = db.users.find_one()
+#     promo_code = message.text
+#     plan = db.plans.find_one(is_free=True)
+#     conv  = await get_conversation()
+#     if(promo_code == plan['promo_code']):    
+#         user = db.users.find_one(user_id=message.chat.id)
+#         db.transactions.update(dict(id=int(conv['txt_id']),status="success"),['id'])
+#         data = dict(
+#             user_id =  int(user['id']),
+#             transaction_id = int(conv['txt_id']),
+#             start_date=datetime.now(),
+#             due_date=datetime.now() + timedelta(days=30),
+#             uptime = 0
+#         )
+#         db.subscriptions.insert(data)
+#         await bot.send_message(chat_id = message.chat.id,text="you are successfully subscribed.enjoy it.")
 
 
-    else:
-        await bot.send_message(chat_id = message.chat.id,text="Invalid Promo code")
+#     else:
+#         await bot.send_message(chat_id = message.chat.id,text="Invalid Promo code")
     
-    db.conversations.delete()
+#     db.conversations.delete()
 
 
-accepte_promo_code_handler = MessageHandler(callback=accepte_promo_code,filters=filters.text & accepte_promocode_func_filter)
+# accepte_promo_code_handler = MessageHandler(callback=accepte_promo_code,filters=filters.text & accepte_promocode_func_filter)
 
 
 async def user_plan_preference(bot,callback_query):
@@ -238,31 +249,23 @@ async def user_plan_preference(bot,callback_query):
 user_plan_preference_handler = CallbackQueryHandler(user_plan_preference,filters=filters.regex("1|2|3"))
 
 
-async def close_session(bot,callback_query):
-    print(callback_query.data)
-    db.messages.delete()
-    try:
-        end_session_prompt = db.get_setting()['end_of_session_prompt']
-        answer = openai_helper.get_chat_response(callback_query.from_user.id,end_session_prompt)
-        await bot.delete_messages(
-            chat_id = callback_query.from_user.id,
-            message_ids = callback_query.message.id
-        )
+# async def close_session(bot,callback_query):
+#     print(callback_query.data)
+#     db.messages.delete()
+#     end_session_prompt = db.get_setting()['end_of_session_prompt']
+#     answer = openai_helper.get_chat_response(callback_query.from_user.id,end_session_prompt)
+#     await bot.delete_messages(
+#         chat_id = callback_query.from_user.id,
+#         message_ids = callback_query.message.id
+#     )
 
-        await bot.send_message(
-            chat_id = callback_query.from_user.id,
-            text = answer
-        )
-    except:
-        pass
+#     await bot.send_message(
+#         chat_id = callback_query.from_user.id,
+#         text = answer
+#     )
 
 
-    
- 
-
-close_session_handler = CallbackQueryHandler(callback=close_session,filters=filters.regex('close_session'))
-
-
+# close_session_handler = CallbackQueryHandler(callback=close_session,filters=filters.regex('close_session'))
 
 
 
@@ -276,7 +279,12 @@ async def account_detail(bot,message):
         plan = db.plans.find_one(id=int(subscription['plan_id']))
         plan_name = plan['name']
         plan_num_session = plan ['number_of_session']
-        uptime = subscription['uptime']
+        first_message_datetime = subscription['first_message_datetime'].timestamp()
+        final_message_datetime = subscription['final_message_datetime'].timestamp()
+        difference =  (final_message_datetime - first_message_datetime) / 60
+        current_session = int(difference / config.ONE_SESSION_IN_MINUTES)
+        remaning_sessions = plan['number_of_session']  - current_session
+
         button= InlineKeyboardMarkup(
         [
             [
@@ -288,7 +296,7 @@ async def account_detail(bot,message):
         ] 
         )
 
-        account_detail = account_detail + f"Plan: {plan_name}\nNumber of Session:{plan_num_session}\nRemaining Number of Session: {plan_num_session-(uptime//60)} sessions only\n\nNote\n one session is {config.ONE_SESSION_IN_MINUTES} minutes only."
+        account_detail = account_detail + f"Plan: {plan_name}\nNumber of Session:{plan_num_session}\nRemaining Number of Session: {remaning_sessions} sessions only\n\nNote\n one session is {config.ONE_SESSION_IN_MINUTES} minutes only."
 
         await bot.send_message(chat_id = message.chat.id,text = account_detail,reply_markup = button)
 
@@ -313,11 +321,17 @@ async def start(bot,message):
     query =  message.text.split(" ")[1] if len(message.text.split(" ")) == 2 else None
     await bot.send_message(chat_id = message.chat.id,text = f"wellcome {message.chat.first_name}",reply_markup=main_menu)
 
-    if(query == "buy_session"):
+    if(query == "add_account"):
+        text = "we registered you automatically to our database. now you can buy the plan.enjoy!"
+        await bot.send_message(chat_id = message.chat.id,text=text)
         await send_invoice(bot,message)
     if(query == "start_session"):
         await account_detail(bot,message)
 
+start_handler = MessageHandler(start,filters=filters.command('start'))
+
+
+@register
 async def main_menu(bot,message):
     menu = message.text
 
@@ -326,17 +340,12 @@ async def main_menu(bot,message):
     if(menu == "Buy Session"):
         await  send_invoice(bot,message)
 
-
-
-
-
 main_menu_handler = MessageHandler(callback=main_menu,filters=filters.regex("Start Session|Buy Session"))
 
 
 
 
 
-start_handler = MessageHandler(start,filters=filters.command('start'))
 
 async def send_welcome_message_to_the_client_job():
     for subscription in db.subscriptions.find(welcome_message_sent = False):
@@ -391,8 +400,8 @@ async def attach_button_for_pinned_post(bot,message):
                         ],
                         [
                             InlineKeyboardButton(
-                                "Buy Session",
-                                url = f"t.me/{_bot.username}?start=buy_session"
+                                "Add Account",
+                                url = f"t.me/{_bot.username}?start=add_account"
                             )
                         ]
                     ]
@@ -407,10 +416,9 @@ async def attach_button_for_pinned_post(bot,message):
 attach_button_for_pinned_post_handler = MessageHandler(callback=attach_button_for_pinned_post,filters=filters.pinned_message)
 
 
-# @only_for_registered
-# @only_for_subscribers
 @registered(bot)
 @only_for_subscribers(bot)
+@set_used_session(bot)
 @has_session
 @typing
 @timeit(bot)
@@ -432,7 +440,7 @@ bot.add_handler(attach_button_for_pinned_post_handler)
 # bot.add_handler(display_plan_handler)
 # bot.add_handler(user_plan_preference_handler)
 bot.add_handler(main_menu_handler)
-bot.add_handler(close_session_handler)
+# bot.add_handler(close_session_handler)
 bot.add_handler(raw_update_handler_function_handler)
 app.start()
 bot.run()

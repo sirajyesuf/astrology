@@ -23,13 +23,22 @@ class SettingResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Textarea::make('end_of_session_prompt')
-                ->rows(4)
-                ->cols(4),
                 Forms\Components\Textarea::make('start_of_session_prompt')
-                ->rows(4)
-                ->cols(4)
-
+                ->label('Start of A Session Prompt')
+                ->rows(5)
+                ->cols(5),
+                Forms\Components\Textarea::make('end_of_session_prompt')
+                ->label('End of A Session Prompt')
+                ->rows(5)
+                ->cols(5),
+                Forms\Components\Textarea::make('end_of_all_sessions_propmt')
+                ->label('End of All Sessions propmt')
+                ->rows(5)
+                ->cols(5),
+                Forms\Components\Textarea::make('astrologer_contact_prompt')
+                ->label('Astrologer Contact Prompt')
+                ->rows(5)
+                ->cols(5) 
             ]);
     }
 
@@ -37,9 +46,15 @@ class SettingResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make("end_of_session_prompt"),
-                Tables\Columns\TextColumn::make("start_of_session_prompt"),
-
+                
+                Tables\Columns\TextColumn::make("start_of_session_prompt")
+                ->limit(70),
+                Tables\Columns\TextColumn::make("end_of_session_prompt")
+                ->limit(70),
+                Tables\Columns\TextColumn::make("end_of_all_sessions_propmt")
+                ->limit(70),
+                Tables\Columns\TextColumn::make("astrologer_contact_prompt")
+                ->limit(70),
             ])
             ->filters([
                 //

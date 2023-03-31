@@ -18,9 +18,9 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('plan_id')->references('id')->on('plans');
             $table->integer('status');
-            $table->bigInteger('uptime');
-            $table->boolean('welcome_message_sent')->default(0);
-            $table->integer('number_of_propmt')->default(0);
+            $table->dateTime('first_message_datetime')->nullable();
+            $table->dateTime('final_message_datetime')->nullable();
+            $table->integer("used_sessions")->nullable();
             $table->timestamps();
         });
     }
