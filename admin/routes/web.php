@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Notification;
 
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('admin');
 });
 
 
