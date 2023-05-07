@@ -264,47 +264,49 @@ def typing(func):
 
 
 async def countdown(bot,message,remaning_sessions_in_minutes):
-        print(bot)
+        print("count down bot is called")
         
-        print("remaning_sessions_in_minutes")
-        print(remaning_sessions_in_minutes)
-        
-        # button= InlineKeyboardMarkup(
-        #             [
-        #                 [
-        #                     InlineKeyboardButton(
-        #                         "❌ Close Session",
-        #                         callback_data="close_session"
-        #                     )
-        #                 ]
-        #             ]
-        # )
+        if(float(remaning_sessions_in_minutes) > 0):
 
-        if(remaning_sessions_in_minutes > 0):
+            await bot.send_message(
+                chat_id = message.chat.id,
+                text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+                )
 
-            messages = db.messages.count(telegram_user_id = message.chat.id)
-            if(messages):
-                messages = db.messages.find_one(telegram_user_id = message.chat.id)
-                try:
-                    await bot.edit_message_text(
-                        chat_id=message.chat.id,
-                        message_id=messages['message_id'],
-                        text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
-                        )
-                except errors.exceptions.bad_request_400.MessageNotModified:
-                    print(remaning_sessions_in_minutes)
-            else:
-                response = await bot.send_message(
-                    chat_id = message.chat.id,
-                    text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
-                    # reply_markup = button
-                    )
-                db.messages.insert({
-                'telegram_user_id':message.chat.id,
-                'message_id':response.id,
-                'start_session_message_id': response.id,
-                'is_close_session_button_sent' :False
-                })
+            # _messages = db.messages.count(telegram_user_id = message.chat.id)
+            # if(_messages):
+            #     _messages = db.messages.find_one(telegram_user_id = message.chat.id)
+            #     try:
+            #         await bot.edit_message_text(
+            #             chat_id=message.chat.id,
+            #             message_id=_messages['message_id'],
+            #             text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+            #             )
+            #     except errors.exceptions.bad_request_400.MessageNotModified:
+            #         print("MessageNotModified")
+            #         response = await bot.send_message(
+            #         chat_id = message.chat.id,
+            #         text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+            #         # reply_markup = button
+            #         )
+            #         db.messages.insert({
+            #         'telegram_user_id':message.chat.id,
+            #         'message_id':response.id,
+            #         'start_session_message_id': response.id,
+            #         'is_close_session_button_sent' :False
+            #         })
+            # else:
+            #     response = await bot.send_message(
+            #         chat_id = message.chat.id,
+            #         text=f"#Remaning Sessions in Minutes\n\n ⏳ {remaning_sessions_in_minutes} minutes only.",
+            #         # reply_markup = button
+            #         )
+            #     db.messages.insert({
+            #     'telegram_user_id':message.chat.id,
+            #     'message_id':response.id,
+            #     'start_session_message_id': response.id,
+            #     'is_close_session_button_sent' :False
+            #     })
         else:
             db.messages.delete()
             text = f"Dear {{message.chat.first_name}}\n\nI'm sorry to inform you that your subscription has ended.We hope that you enjoyed using our service during your subscription period.\nwe would like to offer you a discounted plan to continue using our service. Our discounted plan offers the same features as your previous subscription, but at a lower cost."

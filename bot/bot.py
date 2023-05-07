@@ -46,13 +46,13 @@ bot=Client("bot",api_id=config.API_ID,api_hash=config.API_HASH,bot_token=config.
 #             if(plan_num_session_in_min < subscription['uptime']):
 #                 data = dict(id=subscription['id'],status = 0)
 #                 db.subscriptions.update(data,['id'])
-                
+
 
 
 # async def get_conversation():
 #     for conv in db.conversations.all():
 #         return conv
-    
+
 # async def accepte_promocode_func(_, __, query):
         
 #         print("accepte_promocode_func")
@@ -77,8 +77,8 @@ async def activate_the_subscription(subscription_id,user_id):
     # send start of session prompt
     start_of_session_prompt = db.get_setting()['astrologer_contact_prompt']
     answer = openai_helper.get_chat_response(user_id,start_of_session_prompt)
-    # length_of_words_in_gpt_answer = len(answer.split(" "))
-    # time.sleep(length_of_words_in_gpt_answer)
+    length_of_words_in_gpt_answer = len(answer.split(" "))
+    time.sleep(length_of_words_in_gpt_answer)
     await app.send_message(chat_id = user_id,text = answer)
 
 
@@ -444,6 +444,8 @@ bot.add_handler(main_menu_handler)
 bot.add_handler(raw_update_handler_function_handler)
 app.start()
 bot.run()
+
+
 
 
 
